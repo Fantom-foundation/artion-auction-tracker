@@ -67,6 +67,15 @@ const trackAuction = () => {
         nftAddress = toLowerCase(nftAddress)
         console.log('auction update price')
         console.log(nftAddress, tokenID, reservePrice)
+        // update the price
+        let token = await ERC721TOKEN.findOne({
+          contractAddress: nftAddress,
+          tokenID: tokenID,
+        })
+        if (token) {
+          token.price = parseFloat(reservePrice.toString()) / 10 ** 18
+          await token.save()
+        }
         let bid = await Bid.findOne({
           minter: nftAddress,
           tokenID: tokenID,
@@ -184,6 +193,17 @@ const trackAuction = () => {
         winner = toLowerCase(winner)
         console.log('auction resulted')
         console.log(nftAddress, tokenID, winner, winningBid)
+        // update the last sale price
+        let token = await ERC721TOKEN.findOne({
+          contractAddress: nftAddress,
+          tokenID: tokenID,
+        })
+        if (token) {
+          token.price = parseFloat(winningBid.toString()) / 10 ** 18
+          token.lastSalePrice = parseFloat(winningBid.toString()) / 10 ** 18
+          token.saleEndsAt = Date.now()
+          await token.save()
+        }
         try {
           let tk = await ERC721TOKEN.findOne({
             contractAddress: nftAddress,
