@@ -10,19 +10,26 @@ const auctionSC = contractutils.loadContractFromAddress()
 
 const MailService = require('../utils/mailer')
 
+const toLowerCase = (val) => {
+  if (val) return val.toLowerCase()
+  else return val
+}
+
 const trackAuction = () => {
   console.log('auction tracker has been started')
 
   auctionSC.on('AuctionCreated', async (nftAddress, tokenID) => {
+    nftAddress = toLowerCase(nftAddress)
     console.log('auction created')
     console.log(nftAddress, tokenID)
     await Auction.deleteMany({
-      minter: nftAddress.toLowerCase(),
+      minter: nftAddress,
       tokenID: tokenID,
     })
     let auction = new Auction()
-    auction.minter = nftAddress.toLowerCase()
+    auction.minter = toLowerCase(nftAddress)
     auction.tokenID = tokenID
+    auction.bidder = 0
     await auction.save()
     console.log('new auction saved')
   })
@@ -30,10 +37,11 @@ const trackAuction = () => {
   auctionSC.on(
     'UpdateAuctionStartTime',
     async (nftAddress, tokenID, startTime) => {
+      nftAddress = toLowerCase(nftAddress)
       console.log('update auction start time')
       console.log(nftAddress, tokenID, startTime)
       let auction = await Auction.findOne({
-        minter: nftAddress.toLowerCase(),
+        minter: toLowerCase(nftAddress),
         tokenID: tokenID,
         endTime: { $gt: Date.now() },
       })
@@ -51,45 +59,52 @@ const trackAuction = () => {
   auctionSC.on(
     'UpdateAuctionReservePrice',
     async (nftAddress, tokenID, reservePrice) => {
+      nftAddress = toLowerCase(nftAddress)
       console.log('auction update price')
       console.log(nftAddress, tokenID, reservePrice)
-      let bid = await auctionSC.getHighestBidder(
-        nftAddress.toLowerCase(),
-        tokenID,
-      )
-      console.log('bid')
-      console.log(bid)
-      let bidder = bid[0]
-      let account = Account.findOne({ address: bidder.toLowerCase() })
-      console.log('account')
-      console.log(account)
-      if (account) {
-        try {
-          await MailService.sendEmail(
-            account.email,
-            'NFT Auction Price Updated',
-            `Dear ${account.alias}, you are getting this email because the nft you has bidded has updated in it's price to ${reservePrice}`,
-          )
-        } catch (error) {
-          console.log('cannot send email, update price')
+      let bid = await Auction.findOne({
+        minter: nftAddress,
+        tokenID: tokenID,
+      })
+      if (bid) {
+        let bidder = toLowerCase(bid.bidder)
+        let account = Account.findOne({ address: bidder })
+        console.log('account')
+        console.log(account)
+        if (account) {
+          try {
+            await MailService.sendEmail(
+              account.email,
+              'NFT Auction Price Updated',
+              `Dear ${account.alias}, you are getting this email because the nft you has bidded has updated in it's price to ${reservePrice}`,
+            )
+          } catch (error) {
+            console.log('cannot send email, update price')
+          }
         }
       }
     },
   )
 
   auctionSC.on('BidPlaced', async (nftAddress, tokenID, bidder, bid) => {
+    nftAddress = toLowerCase(nftAddress)
+    bidder = toLowerCase(bidder)
     console.log('bid placed')
     console.log(nftAddress, tokenID, bidder, bid)
+    await Bid.deleteMany({
+      minter: nftAddress,
+      tokenID: tokenID,
+    })
     let newBid = new Bid()
-    newBid.minter = nftAddress.toLowerCase()
+    newBid.minter = nftAddress
     newBid.tokenID = tokenID
-    newBid.bidder = bidder.toLowerCase()
+    newBid.bidder = bidder
     newBid.bid = bid
     await newBid.save()
     console.log('new bid saved')
     let tk = await ERC721TOKEN.findOne({
       tokenID: tokenID,
-      contractAddress: nftAddress.toLowerCase(),
+      contractAddress: nftAddress,
     })
     console.log('tk')
     console.log(tk)
@@ -112,22 +127,17 @@ const trackAuction = () => {
   })
 
   auctionSC.on('BidWithdrawn', async (nftAddress, tokenID, bidder, bid) => {
+    nftAddress = toLowerCase(nftAddress)
+    bidder = toLowerCase(bidder)
     console.log('bid withdrawn')
     console.log(nftAddress, tokenID, bidder, bid)
-    let oldBid = await Bid.findOne({
-      minter: nftAddress.toLowerCase(),
+    await Bid.deleteMany({
+      minter: nftAddress,
       tokenID: tokenID,
-      bidder: bidder.toLowerCase(),
-      bid: bid,
     })
-    console.log('old bid')
-    console.log(oldBid)
-    if (oldBid) {
-      await oldBid.remove()
-    }
     let tk = await ERC721TOKEN.findOne({
       tokenID: tokenID,
-      contractAddress: nftAddress.toLowerCase(),
+      contractAddress: nftAddress,
     })
     console.log(tk)
     if (tk) {
@@ -139,7 +149,7 @@ const trackAuction = () => {
         try {
           await MailService.sendEmail(
             account.email,
-            'You got a bid for your NFT',
+            'You got a bid withdrawn for your NFT',
             `Dear ${account.alias}, you are getting this email because your nft item has lost a bid from ${bidder} with the price of ${bid}`,
           )
         } catch (error) {
@@ -155,27 +165,29 @@ const trackAuction = () => {
   auctionSC.on(
     'AuctionResulted',
     async (nftAddress, tokenID, winner, winningBid) => {
+      nftAddress = toLowerCase(nftAddress)
+      winner = toLowerCase(winner)
       console.log('auction resulted')
       console.log(nftAddress, tokenID, winner, winningBid)
       try {
         let tk = await ERC721TOKEN.findOne({
-          contractAddress: nftAddress.toLowerCase(),
+          contractAddress: nftAddress,
           tokenID: tokenID,
         })
         console.log('tk')
         console.log(tk)
         if (tk) {
-          let from = tk.owner
+          let from = toLowerCase(tk.owner)
           let history = new TradeHistory()
-          history.collectionAddress = nftAddress.toLowerCase()
+          history.collectionAddress = nftAddress
           history.tokenID = tokenID
-          history.from = from.toLowerCase()
-          history.to = winner.toLowerCase()
+          history.from = from
+          history.to = winner
           history.price = winningBid
           history.isAuction = true
           await history.save()
           console.log('history saved')
-          tk.owner = winner.toLowerCase()
+          tk.owner = winner
           await tk.save()
           console.log('tk updated')
         }
@@ -185,7 +197,10 @@ const trackAuction = () => {
       }
 
       try {
-        await Auction.deleteMany({ minter: nftAddress, tokenID: tokenID })
+        await Auction.deleteMany({
+          minter: nftAddress,
+          tokenID: tokenID,
+        })
       } catch (error) {
         console.log('auction resulted')
         console.log('remove from db')
@@ -209,20 +224,31 @@ const trackAuction = () => {
     },
   )
   auctionSC.on('AuctionCancelled', async (nftAddress, tokenID) => {
+    nftAddress = toLowerCase(nftAddress)
     console.log('auction cancelled')
+    await Auction.deleteMany({
+      minter: nftAddress,
+      tokenID: tokenID,
+    })
     console.log(nftAddress, tokenID)
-    let bidder = await auctionSC.getHighestBidder(
-      nftAddress.toLowerCase(),
-      tokenID,
-    )
-    console.log('bidder')
-    let address = bidder[0]
-    console.log('bidder 0')
-    console.log(bidder)
-    console.log('address')
-    console.log(address)
-    let account = await Account.findOne({ address: address })
+    let bid = await Bid.findOne({
+      minter: nftAddress,
+      tokenID: tokenID,
+    })
+    await Bid.deleteMany({
+      minter: nftAddress,
+      tokenID: tokenID,
+    })
+    console.log('bid is ')
+    console.log(bid)
+    if (!bid) return
+    let bidder = toLowerCase(bid.bidder)
+    console.log(`bidder is ${bidder}`)
+    let account = await Account.findOne({ address: bidder })
+    console.log('account is ')
+    console.log(account)
     if (account) {
+      console.log(`email is ${account.email}`)
       try {
         await MailService.sendEmail(
           account.email,
