@@ -15,6 +15,10 @@ const toLowerCase = (val) => {
   else return val
 }
 
+const parseToFTM = (inWei) => {
+  return parseFloat(inWei.toString()) / 10 ** 18
+}
+
 const trackAuction = () => {
   console.log('auction tracker has been started')
 
@@ -63,6 +67,7 @@ const trackAuction = () => {
   auctionSC.on(
     'UpdateAuctionReservePrice',
     async (nftAddress, tokenID, reservePrice) => {
+      reservePrice = parseToFTM(reservePrice)
       try {
         nftAddress = toLowerCase(nftAddress)
         console.log('auction update price')
@@ -73,7 +78,7 @@ const trackAuction = () => {
           tokenID: tokenID,
         })
         if (token) {
-          token.price = parseFloat(reservePrice.toString()) / 10 ** 18
+          token.price = reservePrice
           await token.save()
         }
         let bid = await Bid.findOne({
@@ -94,7 +99,7 @@ const trackAuction = () => {
               await MailService.sendEmail(
                 account.email,
                 'NFT Auction Price Updated',
-                `Dear ${account.alias}, you are getting this email because the nft you has bidded has updated in it's price to ${reservePrice}`,
+                `Dear ${account.alias}, you are getting this email because the nft you has bidded has updated in it's price to ${reservePrice} FTM`,
               )
             } catch (error) {
               console.log('cannot send email, update price')
@@ -109,6 +114,7 @@ const trackAuction = () => {
     try {
       nftAddress = toLowerCase(nftAddress)
       bidder = toLowerCase(bidder)
+      bid = parseToFTM(bid)
       console.log('bid placed')
       console.log(nftAddress, tokenID, bidder, bid)
       await Bid.deleteMany({
@@ -136,7 +142,7 @@ const trackAuction = () => {
             await MailService.sendEmail(
               account.email,
               'You got a bid for your NFT',
-              `Dear ${account.alias}, you are getting this email because your nft item got a bid from ${bidder} with the price of ${bid}`,
+              `Dear ${account.alias}, you are getting this email because your nft item got a bid from ${bidder} with the price of ${bid} FTM`,
             )
           } catch (error) {
             console.log('bid placed')
@@ -148,6 +154,7 @@ const trackAuction = () => {
   })
 
   auctionSC.on('BidWithdrawn', async (nftAddress, tokenID, bidder, bid) => {
+    bid = parseToFTM(bid)
     try {
       nftAddress = toLowerCase(nftAddress)
       bidder = toLowerCase(bidder)
@@ -171,8 +178,8 @@ const trackAuction = () => {
           try {
             await MailService.sendEmail(
               account.email,
-              'You got a bid withdrawn for your NFT',
-              `Dear ${account.alias}, you are getting this email because your nft item has lost a bid from ${bidder} with the price of ${bid}`,
+              'You got a bid withdrawn from your NFT',
+              `Dear ${account.alias}, you are getting this email because your nft item has lost a bid from ${bidder} with the price of ${bid} FTM`,
             )
           } catch (error) {
             console.log('bid withdraw')
@@ -188,6 +195,7 @@ const trackAuction = () => {
   auctionSC.on(
     'AuctionResulted',
     async (nftAddress, tokenID, winner, winningBid) => {
+      winningBid = parseToFTM(winningBid)
       try {
         nftAddress = toLowerCase(nftAddress)
         winner = toLowerCase(winner)
@@ -200,7 +208,7 @@ const trackAuction = () => {
         })
         if (token) {
           token.price
-          token.lastSalePrice = parseFloat(winningBid.toString()) / 10 ** 18
+          token.lastSalePrice = winningBid
           token.saleEndsAt = Date.now()
           await token.save()
           try {
@@ -264,14 +272,16 @@ const trackAuction = () => {
         minter: nftAddress,
         tokenID: tokenID,
       })
+      let bidder = toLowerCase(bid.bidder)
+      console.log('bid is ')
+      console.log(bid)
       await Bid.deleteMany({
         minter: nftAddress,
         tokenID: tokenID,
       })
-      console.log('bid is ')
-      console.log(bid)
+
       if (!bid) return
-      let bidder = toLowerCase(bid.bidder)
+
       console.log(`bidder is ${bidder}`)
       let account = await Account.findOne({ address: bidder })
       console.log('account is ')
@@ -281,7 +291,7 @@ const trackAuction = () => {
         try {
           await MailService.sendEmail(
             account.email,
-            'You got a bid for your NFT',
+            'Auction called off',
             `Dear ${account.alias}, you are getting this email because the nft item you bided has lost from Auction`,
           )
         } catch (error) {
