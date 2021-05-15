@@ -241,6 +241,12 @@ const trackAuction = () => {
           console.log('remove from db')
           console.log(error)
         }
+        try {
+          await Bid.deleteMany({
+            minter: nftAddress,
+            tokenID: tokenID,
+          })
+        } catch (error) {}
 
         try {
           let account = await Account.findOne({ address: winner })
