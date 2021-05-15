@@ -199,36 +199,28 @@ const trackAuction = () => {
           tokenID: tokenID,
         })
         if (token) {
-          token.price = parseFloat(winningBid.toString()) / 10 ** 18
+          token.price
           token.lastSalePrice = parseFloat(winningBid.toString()) / 10 ** 18
           token.saleEndsAt = Date.now()
           await token.save()
-        }
-        try {
-          let tk = await ERC721TOKEN.findOne({
-            contractAddress: nftAddress,
-            tokenID: tokenID,
-          })
-          console.log('tk')
-          console.log(tk)
-          if (tk) {
-            let from = toLowerCase(tk.owner)
-            let history = new TradeHistory()
-            history.collectionAddress = nftAddress
-            history.tokenID = tokenID
-            history.from = from
-            history.to = winner
-            history.price = winningBid
-            history.isAuction = true
-            await history.save()
-            console.log('history saved')
-            tk.owner = winner
-            await tk.save()
-            console.log('tk updated')
+          try {
+            if (token) {
+              let from = toLowerCase(token.owner)
+              let history = new TradeHistory()
+              history.collectionAddress = nftAddress
+              history.tokenID = tokenID
+              history.from = from
+              history.to = winner
+              history.price = winningBid
+              history.isAuction = true
+              await history.save()
+              console.log('history saved')
+              console.log('tk updated')
+            }
+          } catch (error) {
+            console.log('auction resulted')
+            console.log(error)
           }
-        } catch (error) {
-          console.log('auction resulted')
-          console.log(error)
         }
 
         try {

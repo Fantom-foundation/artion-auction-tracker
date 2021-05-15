@@ -25,6 +25,6 @@ mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
 const db = mongoose.connection
 db.on('error', console.error.bind(console, 'connection error:'))
 db.once('open', async () => {
-  console.log('nifty server has been connected to the db server')
+  console.log('Auction Tracker has been connected to the db server')
   trackAuction()
 })
