@@ -1,14 +1,28 @@
+require('dotenv').config()
+const ethers = require('ethers')
 const mongoose = require('mongoose')
 const Auction = mongoose.model('Auction')
 const Account = mongoose.model('Account')
 const Bid = mongoose.model('Bid')
 const ERC721TOKEN = mongoose.model('ERC721TOKEN')
-const TradeHistory = mongoose.model('TradeHistory')
+const Collection = mongoose.model('Collection')
 
-const contractutils = require('../utils/contracts.utils')
-const auctionSC = contractutils.loadContractFromAddress()
+const Auction_SC = require('../constants/auction_sc_abi')
+let rpcapi = process.env.MAINNET_RPC
 
-const MailService = require('../utils/mailer')
+let provider = new ethers.providers.JsonRpcProvider(rpcapi, 250)
+
+const loadAuctionContract = () => {
+  let abi = Auction_SC.abi
+  let address = Auction_SC.address
+
+  let contract = new ethers.Contract(address, abi, provider)
+  return contract
+}
+
+const auctionSC = loadAuctionContract()
+
+const sendEmail = require('../utils/mailer')
 
 const toLowerCase = (val) => {
   if (val) return val.toLowerCase()
@@ -17,6 +31,41 @@ const toLowerCase = (val) => {
 
 const parseToFTM = (inWei) => {
   return parseFloat(inWei.toString()) / 10 ** 18
+}
+
+const getCollectionName = async (address) => {
+  try {
+    let collection = await Collection.findOne({
+      erc721Address: toLowerCase(address),
+    })
+    if (collection) return collection.collectionName
+    else return address
+  } catch (error) {
+    return address
+  }
+}
+
+const get721ItemName = async (nft, tokenID) => {
+  try {
+    let token = await ERC721TOKEN.findOne({
+      contractAddress: toLowerCase(nft),
+      tokenID: tokenID,
+    })
+    if (token) return token.name
+    else return ''
+  } catch (error) {
+    return ''
+  }
+}
+
+const getUserAlias = async (walletAddress) => {
+  try {
+    let account = await Account.findOne({ address: walletAddress })
+    if (account) return account.alias
+    else return walletAddress
+  } catch (error) {
+    return walletAddress
+  }
 }
 
 const trackAuction = () => {
@@ -69,41 +118,54 @@ const trackAuction = () => {
   auctionSC.on(
     'UpdateAuctionReservePrice',
     async (nftAddress, tokenID, reservePrice) => {
+      nftAddress = toLowerCase(nftAddress)
       reservePrice = parseToFTM(reservePrice)
-      try {
-        nftAddress = toLowerCase(nftAddress)
-        // update the price
-        let token = await ERC721TOKEN.findOne({
-          contractAddress: nftAddress,
-          tokenID: tokenID,
-        })
-        if (token) {
-          token.price = reservePrice
-          token.saleEndsAt = new Date()
-          await token.save()
-        }
-        let bid = await Bid.findOne({
-          minter: nftAddress,
-          tokenID: tokenID,
-        })
-        if (bid) {
-          let bidder = toLowerCase(bid.bidder)
-          console.log('bidder')
-          console.log(bidder)
-          let account = await Account.findOne({ address: bidder })
-          if (account) {
-            try {
-              await MailService.sendEmail(
-                account.email,
-                'NFT Auction Price Updated',
-                `Dear ${account.alias}, you are getting this email because the nft you has bidded has updated in it's price to ${reservePrice} FTM`,
-              )
-            } catch (error) {
-              console.log('cannot send email, update price')
-            }
+      let bid = await Auction.findOne({
+        minter: nftAddress,
+        tokenID: tokenID,
+      })
+      console.log('update price')
+      if (bid) {
+        let bidder = toLowerCase(bid.bidder)
+        let account = Account.findOne({ address: bidder })
+        console.log('account')
+        console.log(account)
+
+        if (account) {
+          let to = account.email
+          let alias = account.alias
+          let collectionName = await getCollectionName(nftAddress)
+          let tokenName = await get721ItemName(nftAddress, tokenID)
+          let data = {
+            type: 'auction',
+            to: to,
+            event: 'UpdateAuctionReservePrice',
+            subject: 'NFT Auction Price Updated',
+            alias: alias,
+            collectionName: collectionName,
+            tokenName: tokenName,
+            tokenID: tokenID,
+            nftAddress: nftAddress,
+            newPrice: reservePrice,
           }
+          sendEmail(data)
         }
-      } catch (error) {}
+      }
+      // reservePrice = parseToFTM(reservePrice)
+      // try {
+      //   nftAddress = toLowerCase(nftAddress)
+      //   // update the price
+      //   let token = await ERC721TOKEN.findOne({
+      //     contractAddress: nftAddress,
+      //     tokenID: tokenID,
+      //   })
+      //   if (token) {
+      //     //don't update the price caz auction price is not the one considered as a price
+      //     token.price = reservePrice
+      //     token.saleEndsAt = new Date()
+      //     await token.save()
+      //   }
+      // } catch (error) {}
     },
   )
 
@@ -112,6 +174,37 @@ const trackAuction = () => {
       nftAddress = toLowerCase(nftAddress)
       bidder = toLowerCase(bidder)
       bid = parseToFTM(bid)
+      let tk = await ERC721TOKEN.findOne({
+        tokenID: tokenID,
+        contractAddress: nftAddress,
+      })
+
+      console.log('bid placed')
+      if (tk) {
+        let address = tk.owner
+        let account = await Account.findOne({ address: address })
+        if (account) {
+          let to = account.email
+          let alias = account.alias
+          let collectionName = await getCollectionName(nftAddress)
+          let tokenName = await get721ItemName(nftAddress, tokenID)
+          let bidderAlias = await getUserAlias(bidder)
+          let data = {
+            type: 'auction',
+            to: to,
+            event: 'BidPlaced',
+            subject: 'You got a bid for your item!',
+            alias: alias,
+            bidderAlias: bidderAlias,
+            collectionName: collectionName,
+            tokenName: tokenName,
+            tokenID: tokenID,
+            nftAddress: nftAddress,
+            bid: bid,
+          }
+          sendEmail(data)
+        }
+      }
       await Bid.deleteMany({
         minter: nftAddress,
         tokenID: tokenID,
@@ -122,28 +215,47 @@ const trackAuction = () => {
       newBid.bidder = bidder
       newBid.bid = bid
       await newBid.save()
-      let tk = await ERC721TOKEN.findOne({
-        tokenID: tokenID,
-        contractAddress: nftAddress,
-      })
-      if (tk) {
-        let address = tk.owner
-        let account = await Account.findOne({ address: address })
-        if (account) {
-          try {
-            await MailService.sendEmail(
-              account.email,
-              'You got a bid for your NFT',
-              `Dear ${account.alias}, you are getting this email because your nft item got a bid from ${bidder} with the price of ${bid} FTM`,
-            )
-          } catch (error) {}
-        }
-      }
     } catch (error) {}
   })
 
   auctionSC.on('BidWithdrawn', async (nftAddress, tokenID, bidder, bid) => {
     bid = parseToFTM(bid)
+
+    // send mail
+    let tk = await ERC721TOKEN.findOne({
+      tokenID: tokenID,
+      contractAddress: nftAddress,
+    })
+    console.log('withdraw')
+    if (tk) {
+      let address = tk.owner
+      console.log(address)
+      let account = await Account.findOne({ address: address })
+      if (account) {
+        let to = account.email
+        let alias = account.alias
+        let collectionName = await getCollectionName(nftAddress)
+        let tokenName = await get721ItemName(nftAddress, tokenID)
+        let bidderAlias = await getUserAlias(bidder)
+        let data = {
+          type: 'auction',
+          to: to,
+          event: 'BidWithdrawn',
+          subject: 'You got a bid withdrawn for your item!',
+          alias: alias,
+          bidderAlias: bidderAlias,
+          collectionName: collectionName,
+          tokenName: tokenName,
+          tokenID: tokenID,
+          nftAddress: nftAddress,
+          bid: bid,
+        }
+        sendEmail(data)
+      }
+    } else {
+      console.log('no tk')
+    }
+    // remove bids
     try {
       nftAddress = toLowerCase(nftAddress)
       bidder = toLowerCase(bidder)
@@ -151,25 +263,6 @@ const trackAuction = () => {
         minter: nftAddress,
         tokenID: tokenID,
       })
-      let tk = await ERC721TOKEN.findOne({
-        tokenID: tokenID,
-        contractAddress: nftAddress,
-      })
-      if (tk) {
-        let address = tk.owner
-        console.log(address)
-        let account = await Account.findOne({ address: address })
-        if (account) {
-          try {
-            await MailService.sendEmail(
-              account.email,
-              'You got a bid withdrawn from your NFT',
-              `Dear ${account.alias}, you are getting this email because your nft item has lost a bid from ${bidder} with the price of ${bid} FTM`,
-            )
-          } catch (error) {}
-        }
-      } else {
-      }
     } catch (error) {}
   })
 
@@ -177,9 +270,36 @@ const trackAuction = () => {
     'AuctionResulted',
     async (nftAddress, tokenID, winner, winningBid) => {
       winningBid = parseToFTM(winningBid)
+      nftAddress = toLowerCase(nftAddress)
+      winner = toLowerCase(winner)
       try {
-        nftAddress = toLowerCase(nftAddress)
-        winner = toLowerCase(winner)
+        // send mail
+        try {
+          let account = await Account.findOne({ address: winner })
+          if (account) {
+            let to = account.email
+            let alias = account.alias
+            let collectionName = await getCollectionName(nftAddress)
+            let tokenName = await get721ItemName(nftAddress, tokenID)
+            let data = {
+              type: 'auction',
+              to: to,
+              event: 'AuctionResulted',
+              subject: 'You won the NFT Item!',
+              alias: alias,
+              collectionName: collectionName,
+              tokenName: tokenName,
+              tokenID: tokenID,
+              nftAddress: nftAddress,
+              winningBid: winningBid,
+            }
+            sendEmail(data)
+          }
+        } catch (error) {
+          console.log('auction resulted')
+          console.log('sending email')
+          console.log(error)
+        }
         // update the last sale price
         let token = await ERC721TOKEN.findOne({
           contractAddress: nftAddress,
@@ -223,6 +343,37 @@ const trackAuction = () => {
   auctionSC.on('AuctionCancelled', async (nftAddress, tokenID) => {
     nftAddress = toLowerCase(nftAddress)
     tokenID = parseInt(tokenID)
+    // first send email
+    let bid = await Bid.findOne({
+      minter: nftAddress,
+      tokenID: tokenID,
+    })
+    if (!bid) {
+      console.log('no bidder')
+      return
+    }
+    let bidder = toLowerCase(bid.bidder)
+    let account = await Account.findOne({ address: bidder })
+    if (account) {
+      console.log('cancel')
+      let to = account.email
+      let alias = account.alias
+      let collectionName = await getCollectionName(nftAddress)
+      let tokenName = await get721ItemName(nftAddress, tokenID)
+      let data = {
+        type: 'auction',
+        to: to,
+        event: 'AuctionCancelled',
+        subject: 'Auction cancelled!',
+        alias: alias,
+        collectionName: collectionName,
+        tokenName: tokenName,
+        tokenID: tokenID,
+        nftAddress: nftAddress,
+      }
+      sendEmail(data)
+    }
+    // update
     try {
       let tk = await ERC721TOKEN.findOne({
         contractAddress: nftAddress,

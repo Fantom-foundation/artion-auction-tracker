@@ -1,7 +1,7 @@
 require('dotenv').config()
 const ethers = require('ethers')
 
-const AuctionContractInfo = require('../constants/auctioncontractabi')
+const AuctionContractInfo = require('../constants/auction_sc_abi')
 let rpcapi = process.env.MAINNET_RPC
 
 let provider = new ethers.providers.JsonRpcProvider(rpcapi, 250)
