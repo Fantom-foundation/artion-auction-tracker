@@ -217,17 +217,6 @@ const trackAuction = () => {
             tokenID: tokenID,
           })
         } catch (error) {}
-
-        try {
-          let account = await Account.findOne({ address: winner })
-          if (account) {
-            await MailService.sendEmail(
-              account.email,
-              'You won the NFT from Auction',
-              `Dear ${account.alias}, you are getting this email because you won the nft from auction`,
-            )
-          }
-        } catch (error) {}
       } catch (error) {}
     },
   )
@@ -248,32 +237,10 @@ const trackAuction = () => {
         minter: nftAddress,
         tokenID: tokenID,
       })
-      console.log(nftAddress, tokenID)
-      let bid = await Bid.findOne({
-        minter: nftAddress,
-        tokenID: tokenID,
-      })
-      let bidder = toLowerCase(bid.bidder)
       await Bid.deleteMany({
         minter: nftAddress,
         tokenID: tokenID,
       })
-
-      if (!bid) return
-
-      let account = await Account.findOne({ address: bidder })
-      if (account) {
-        try {
-          await MailService.sendEmail(
-            account.email,
-            'Auction called off',
-            `Dear ${account.alias}, you are getting this email because the nft item you bided has lost from Auction`,
-          )
-        } catch (error) {}
-        try {
-          await Auction.deleteMany({ minter: nftAddress, tokenID: tokenID })
-        } catch (error) {}
-      }
     } catch (error) {}
   })
 }
