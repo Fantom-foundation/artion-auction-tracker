@@ -6,6 +6,7 @@ const Account = mongoose.model('Account')
 const Bid = mongoose.model('Bid')
 const ERC721TOKEN = mongoose.model('ERC721TOKEN')
 const Collection = mongoose.model('Collection')
+const TradeHistory = mongoose.model('TradeHistory')
 
 const Auction_SC = require('../constants/auction_sc_abi')
 let rpcapi = process.env.MAINNET_RPC
@@ -91,7 +92,7 @@ const trackAuction = () => {
     async (nftAddress, tokenID, startTime) => {
       nftAddress = toLowerCase(nftAddress)
       tokenID = parseInt(tokenID)
-      // update saleEndsAt for 712 tk
+      // update saleEndsAt for 721 tk
       try {
         let tk = await ERC721TOKEN.findOne({
           contractAddress: nftAddress,
@@ -120,16 +121,13 @@ const trackAuction = () => {
     async (nftAddress, tokenID, reservePrice) => {
       nftAddress = toLowerCase(nftAddress)
       reservePrice = parseToFTM(reservePrice)
-      let bid = await Auction.findOne({
+      let bid = await Bid.findOne({
         minter: nftAddress,
         tokenID: tokenID,
       })
-      console.log('update price')
       if (bid) {
         let bidder = toLowerCase(bid.bidder)
-        let account = Account.findOne({ address: bidder })
-        console.log('account')
-        console.log(account)
+        let account = await Account.findOne({ address: bidder })
 
         if (account) {
           let to = account.email
@@ -151,21 +149,6 @@ const trackAuction = () => {
           sendEmail(data)
         }
       }
-      // reservePrice = parseToFTM(reservePrice)
-      // try {
-      //   nftAddress = toLowerCase(nftAddress)
-      //   // update the price
-      //   let token = await ERC721TOKEN.findOne({
-      //     contractAddress: nftAddress,
-      //     tokenID: tokenID,
-      //   })
-      //   if (token) {
-      //     //don't update the price caz auction price is not the one considered as a price
-      //     token.price = reservePrice
-      //     token.saleEndsAt = new Date()
-      //     await token.save()
-      //   }
-      // } catch (error) {}
     },
   )
 
@@ -179,7 +162,7 @@ const trackAuction = () => {
         contractAddress: nftAddress,
       })
 
-      console.log('bid placed')
+      // there is only 1 bidder, the top bidder will be the only one who is selected
       if (tk) {
         let address = tk.owner
         let account = await Account.findOne({ address: address })
@@ -226,10 +209,8 @@ const trackAuction = () => {
       tokenID: tokenID,
       contractAddress: nftAddress,
     })
-    console.log('withdraw')
     if (tk) {
       let address = tk.owner
-      console.log(address)
       let account = await Account.findOne({ address: address })
       if (account) {
         let to = account.email
@@ -253,7 +234,6 @@ const trackAuction = () => {
         sendEmail(data)
       }
     } else {
-      console.log('no tk')
     }
     // remove bids
     try {
@@ -295,11 +275,7 @@ const trackAuction = () => {
             }
             sendEmail(data)
           }
-        } catch (error) {
-          console.log('auction resulted')
-          console.log('sending email')
-          console.log(error)
-        }
+        } catch (error) {}
         // update the last sale price
         let token = await ERC721TOKEN.findOne({
           contractAddress: nftAddress,
@@ -311,17 +287,15 @@ const trackAuction = () => {
           token.soldAt = new Date()
           await token.save()
           try {
-            if (token) {
-              let from = toLowerCase(token.owner)
-              let history = new TradeHistory()
-              history.collectionAddress = nftAddress
-              history.tokenID = tokenID
-              history.from = from
-              history.to = winner
-              history.price = winningBid
-              history.isAuction = true
-              await history.save()
-            }
+            let from = toLowerCase(token.owner)
+            let history = new TradeHistory()
+            history.collectionAddress = nftAddress
+            history.tokenID = tokenID
+            history.from = from
+            history.to = winner
+            history.price = winningBid
+            history.isAuction = true
+            await history.save()
           } catch (error) {}
         }
 
@@ -349,13 +323,11 @@ const trackAuction = () => {
       tokenID: tokenID,
     })
     if (!bid) {
-      console.log('no bidder')
       return
     }
     let bidder = toLowerCase(bid.bidder)
     let account = await Account.findOne({ address: bidder })
     if (account) {
-      console.log('cancel')
       let to = account.email
       let alias = account.alias
       let collectionName = await getCollectionName(nftAddress)
