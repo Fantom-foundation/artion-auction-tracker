@@ -322,29 +322,29 @@ const trackAuction = () => {
       minter: nftAddress,
       tokenID: tokenID,
     })
-    if (!bid) {
-      return
-    }
-    let bidder = toLowerCase(bid.bidder)
-    let account = await Account.findOne({ address: bidder })
-    if (account) {
-      let to = account.email
-      let alias = account.alias
-      let collectionName = await getCollectionName(nftAddress)
-      let tokenName = await get721ItemName(nftAddress, tokenID)
-      let data = {
-        type: 'auction',
-        to: to,
-        event: 'AuctionCancelled',
-        subject: 'Auction cancelled!',
-        alias: alias,
-        collectionName: collectionName,
-        tokenName: tokenName,
-        tokenID: tokenID,
-        nftAddress: nftAddress,
+    if (bid) {
+      let bidder = toLowerCase(bid.bidder)
+      let account = await Account.findOne({ address: bidder })
+      if (account) {
+        let to = account.email
+        let alias = account.alias
+        let collectionName = await getCollectionName(nftAddress)
+        let tokenName = await get721ItemName(nftAddress, tokenID)
+        let data = {
+          type: 'auction',
+          to: to,
+          event: 'AuctionCancelled',
+          subject: 'Auction cancelled!',
+          alias: alias,
+          collectionName: collectionName,
+          tokenName: tokenName,
+          tokenID: tokenID,
+          nftAddress: nftAddress,
+        }
+        sendEmail(data)
       }
-      sendEmail(data)
     }
+
     // update
     try {
       let tk = await ERC721TOKEN.findOne({
