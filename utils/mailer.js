@@ -3,7 +3,6 @@ const sgMail = require('@sendgrid/mail')
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
 const createMessage = (data) => {
-  console.log(data.subject)
   let message = {}
   let event = data.event
   const artionUri = `https://artion.io/${data.nftAddress}/${data.tokenID}`
@@ -17,7 +16,7 @@ const createMessage = (data) => {
             from: 'support.artion@fantom.foundation',
             subject: data.subject,
             text: 'artion notification',
-            html: `<p>Dear ${data.alias}<p/> Your bid, from ${data.collectionName}'s ${data.tokenName} has updated it's reserve price to ${data.newPrice} <br/> For more information, click <a href = "${artionUri}">here</a></br><br/></br><br/>  <i><sub>${team}</sub></i>`,
+            html: `<p>Dear ${data.alias}<p/> Your bid, from ${data.collectionName}'s ${data.tokenName} has updated it's reserve price to ${data.newPrice} <br/> For more information, click <a href = "${artionUri}">here</a></br><br/></br><br/>  ${team}`,
           }
         }
         break
@@ -76,15 +75,9 @@ const createMessage = (data) => {
 const sendEmail = (data) => {
   let message = createMessage(data)
   sgMail.send(message).then(
-    () => {
-      console.log('email sent')
-    },
+    () => {},
     (error) => {
-      console.log('failed to send an email')
-      console.error(error)
-
       if (error.response) {
-        console.error(error.response.body)
       }
     },
   )
