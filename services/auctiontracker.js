@@ -74,9 +74,9 @@ const getAuctionEndTime = async (sc, nftAddress, tokenID) => {
     let auction = await sc.getAuction(nftAddress, tokenID)
     if (auction) {
       return new Date(parseInt(auction._endTime.toString()) * 1000)
-    } else return new Date(1970, 1, 1)
+    } else return null
   } catch (error) {
-    return new Date(1970, 1, 1)
+    return null
   }
 }
 
@@ -310,7 +310,7 @@ const trackAuction = () => {
           token.lastSalePrice = winningBid
           token.soldAt = new Date()
           // update sale ends at as well
-          token.saleEndsAt = new Date(1970, 1, 1)
+          token.saleEndsAt = null
           await token.save()
           try {
             let from = toLowerCase(token.owner)
@@ -378,7 +378,7 @@ const trackAuction = () => {
         tokenID: tokenID,
       })
       if (tk) {
-        tk.saleEndsAt = new Date(1970, 1, 1)
+        tk.saleEndsAt = new null()
         await tk.save()
       }
     } catch (error) {}
