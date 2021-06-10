@@ -69,12 +69,24 @@ const getUserAlias = async (walletAddress) => {
   }
 }
 
+const getAuctionEndTime = async (sc, nftAddress, tokenID) => {
+  try {
+    let auction = await sc.getAuction(nftAddress, tokenID)
+    if (auction) {
+      return new Date(parseInt(auction._endTime.toString()) * 1000)
+    } else return new Date(1970, 1, 1)
+  } catch (error) {
+    return new Date(1970, 1, 1)
+  }
+}
+
 const trackAuction = () => {
   console.log('auction tracker has been started')
 
   auctionSC.on('AuctionCreated', async (nftAddress, tokenID) => {
+    nftAddress = toLowerCase(nftAddress)
+    tokenID = parseInt(tokenID)
     try {
-      nftAddress = toLowerCase(nftAddress)
       await Auction.deleteMany({
         minter: nftAddress,
         tokenID: tokenID,
@@ -84,6 +96,18 @@ const trackAuction = () => {
       auction.tokenID = tokenID
       auction.bidder = 0
       await auction.save()
+    } catch (error) {}
+    // update sale ends time
+    try {
+      let token = await ERC721TOKEN.findOne({
+        contractAddress: nftAddress,
+        tokenID: tokenID,
+      })
+      if (token) {
+        let endTime = await getAuctionEndTime(auctionSC, nftAddress, tokenID)
+        token.saleEndsAt = endTime
+        await token.save()
+      }
     } catch (error) {}
   })
 
@@ -285,6 +309,8 @@ const trackAuction = () => {
           token.price = winningBid
           token.lastSalePrice = winningBid
           token.soldAt = new Date()
+          // update sale ends at as well
+          token.saleEndsAt = new Date(1970, 1, 1)
           await token.save()
           try {
             let from = toLowerCase(token.owner)
@@ -353,6 +379,7 @@ const trackAuction = () => {
       })
       if (tk) {
         tk.saleEndsAt = new Date(1970, 1, 1)
+        await tk.save()
       }
     } catch (error) {}
     try {
