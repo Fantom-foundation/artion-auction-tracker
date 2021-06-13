@@ -16,6 +16,7 @@ require('./models/highestblock')
 require('./models/offer')
 require('./models/category')
 require('./models/auction')
+require('./models/nftitems')
 
 const trackAuction = require('./services/auctiontracker')
 

@@ -4,7 +4,7 @@ const mongoose = require('mongoose')
 const Auction = mongoose.model('Auction')
 const Account = mongoose.model('Account')
 const Bid = mongoose.model('Bid')
-const ERC721TOKEN = mongoose.model('ERC721TOKEN')
+const NFTITEM = mongoose.model('NFTITEM')
 const Collection = mongoose.model('Collection')
 const TradeHistory = mongoose.model('TradeHistory')
 
@@ -48,14 +48,14 @@ const getCollectionName = async (address) => {
 
 const get721ItemName = async (nft, tokenID) => {
   try {
-    let token = await ERC721TOKEN.findOne({
+    let token = await NFTITEM.findOne({
       contractAddress: toLowerCase(nft),
       tokenID: tokenID,
     })
     if (token) return token.name
-    else return ''
+    else return tokenID
   } catch (error) {
-    return ''
+    return tokenID
   }
 }
 
@@ -99,7 +99,7 @@ const trackAuction = () => {
     } catch (error) {}
     // update sale ends time
     try {
-      let token = await ERC721TOKEN.findOne({
+      let token = await NFTITEM.findOne({
         contractAddress: nftAddress,
         tokenID: tokenID,
       })
@@ -118,7 +118,7 @@ const trackAuction = () => {
       tokenID = parseInt(tokenID)
       // update saleEndsAt for 721 tk
       try {
-        let tk = await ERC721TOKEN.findOne({
+        let tk = await NFTITEM.findOne({
           contractAddress: nftAddress,
           tokenID: tokenID,
         })
@@ -181,7 +181,7 @@ const trackAuction = () => {
       nftAddress = toLowerCase(nftAddress)
       bidder = toLowerCase(bidder)
       bid = parseToFTM(bid)
-      let tk = await ERC721TOKEN.findOne({
+      let tk = await NFTITEM.findOne({
         tokenID: tokenID,
         contractAddress: nftAddress,
       })
@@ -229,7 +229,7 @@ const trackAuction = () => {
     bid = parseToFTM(bid)
 
     // send mail
-    let tk = await ERC721TOKEN.findOne({
+    let tk = await NFTITEM.findOne({
       tokenID: tokenID,
       contractAddress: nftAddress,
     })
@@ -301,7 +301,7 @@ const trackAuction = () => {
           }
         } catch (error) {}
         // update the last sale price
-        let token = await ERC721TOKEN.findOne({
+        let token = await NFTITEM.findOne({
           contractAddress: nftAddress,
           tokenID: tokenID,
         })
@@ -373,7 +373,7 @@ const trackAuction = () => {
 
     // update
     try {
-      let tk = await ERC721TOKEN.findOne({
+      let tk = await NFTITEM.findOne({
         contractAddress: nftAddress,
         tokenID: tokenID,
       })
