@@ -116,16 +116,6 @@ const trackAuction = () => {
     async (nftAddress, tokenID, startTime) => {
       nftAddress = toLowerCase(nftAddress)
       tokenID = parseInt(tokenID)
-      // update saleEndsAt for 721 tk
-      try {
-        let tk = await NFTITEM.findOne({
-          contractAddress: nftAddress,
-          tokenID: tokenID,
-        })
-        if (tk) {
-          tk.saleEndsAt = new Date(parseInt(startTime) * 1000)
-        }
-      } catch (error) {}
       try {
         let auction = await Auction.findOne({
           minter: toLowerCase(nftAddress),
@@ -133,14 +123,37 @@ const trackAuction = () => {
         })
         if (auction) {
           auction.startTime = new Date(parseInt(startTime) * 1000)
-          let endTime = await getAuctionEndTime(auctionSC, nftAddress, tokenID)
-          auction.endTime = endTime
           await auction.save()
         }
       } catch (error) {}
     },
   )
 
+  auctionSC.on('UpdateAuctionEndTime', async (nftAddress, tokenID, endTime) => {
+    nftAddress = toLowerCase(nftAddress)
+    tokenID = parseInt(tokenID)
+    // update saleEndsAt for 721 tk
+    try {
+      let tk = await NFTITEM.findOne({
+        contractAddress: nftAddress,
+        tokenID: tokenID,
+      })
+      if (tk) {
+        tk.saleEndsAt = new Date(parseInt(endTime) * 1000)
+        await tk.save()
+      }
+    } catch (error) {}
+    try {
+      let auction = await Auction.findOne({
+        minter: toLowerCase(nftAddress),
+        tokenID: tokenID,
+      })
+      if (auction) {
+        auction.endTime = new Date(parseInt(endTime) * 1000)
+        await auction.save()
+      }
+    } catch (error) {}
+  })
   auctionSC.on(
     'UpdateAuctionReservePrice',
     async (nftAddress, tokenID, reservePrice) => {
