@@ -130,10 +130,11 @@ const trackAuction = () => {
         let auction = await Auction.findOne({
           minter: toLowerCase(nftAddress),
           tokenID: tokenID,
-          endTime: { $gt: Date.now() },
         })
         if (auction) {
-          auction.startTime = new Date(startTime)
+          auction.startTime = new Date(parseInt(startTime) * 1000)
+          let endTime = await getAuctionEndTime(auctionSC, nftAddress, tokenID)
+          auction.endTime = endTime
           await auction.save()
         }
       } catch (error) {}
