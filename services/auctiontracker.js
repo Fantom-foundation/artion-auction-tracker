@@ -17,8 +17,8 @@ const loadAuctionContract = () => {
 
 const auctionSC = loadAuctionContract()
 
-const callAPI = (endpoint, data) => {
-  axios({
+const callAPI = async (endpoint, data) => {
+  await axios({
     method: 'post',
     url: apiEndPoint + endpoint,
     data,
@@ -28,21 +28,28 @@ const callAPI = (endpoint, data) => {
 const trackAuction = () => {
   console.log('auction tracker has been started')
 
-  auctionSC.on('AuctionCreated', (nftAddress, tokenID) => {
-    callAPI('auctionCreated', { nftAddress, tokenID })
+  auctionSC.on('AuctionCreated', async (nftAddress, tokenID) => {
+    await callAPI('auctionCreated', { nftAddress, tokenID })
   })
 
-  auctionSC.on('UpdateAuctionStartTime', (nftAddress, tokenID, startTime) => {
-    callAPI('updateAuctionStartTime', { nftAddress, tokenID, startTime })
-  })
+  auctionSC.on(
+    'UpdateAuctionStartTime',
+    async (nftAddress, tokenID, startTime) => {
+      await callAPI('updateAuctionStartTime', {
+        nftAddress,
+        tokenID,
+        startTime,
+      })
+    },
+  )
 
-  auctionSC.on('UpdateAuctionEndTime', (nftAddress, tokenID, endTime) => {
-    callAPI('updateAuctionEndTime', { nftAddress, tokenID, endTime })
+  auctionSC.on('UpdateAuctionEndTime', async (nftAddress, tokenID, endTime) => {
+    await callAPI('updateAuctionEndTime', { nftAddress, tokenID, endTime })
   })
   auctionSC.on(
     'UpdateAuctionReservePrice',
-    (nftAddress, tokenID, reservePrice) => {
-      callAPI('updateAuctionReservePrice', {
+    async (nftAddress, tokenID, reservePrice) => {
+      await callAPI('updateAuctionReservePrice', {
         nftAddress,
         tokenID,
         reservePrice,
@@ -50,19 +57,27 @@ const trackAuction = () => {
     },
   )
 
-  auctionSC.on('BidPlaced', (nftAddress, tokenID, bidder, bid) => {
-    callAPI('bidPlaced', { nftAddress, tokenID, bidder, bid })
+  auctionSC.on('BidPlaced', async (nftAddress, tokenID, bidder, bid) => {
+    await callAPI('bidPlaced', { nftAddress, tokenID, bidder, bid })
   })
 
-  auctionSC.on('BidWithdrawn', (nftAddress, tokenID, bidder, bid) => {
-    callAPI('bidWithdrawn', { nftAddress, tokenID, bidder, bid })
+  auctionSC.on('BidWithdrawn', async (nftAddress, tokenID, bidder, bid) => {
+    await callAPI('bidWithdrawn', { nftAddress, tokenID, bidder, bid })
   })
 
-  auctionSC.on('AuctionResulted', (nftAddress, tokenID, winner, winningBid) => {
-    callAPI('auctionResulted', { nftAddress, tokenID, winner, winningBid })
-  })
-  auctionSC.on('AuctionCancelled', (nftAddress, tokenID) => {
-    callAPI('auctionCancelled', { nftAddress, tokenID })
+  auctionSC.on(
+    'AuctionResulted',
+    async (nftAddress, tokenID, winner, winningBid) => {
+      await callAPI('auctionResulted', {
+        nftAddress,
+        tokenID,
+        winner,
+        winningBid,
+      })
+    },
+  )
+  auctionSC.on('AuctionCancelled', async (nftAddress, tokenID) => {
+    await callAPI('auctionCancelled', { nftAddress, tokenID })
   })
 }
 
