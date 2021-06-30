@@ -17,6 +17,17 @@ const loadAuctionContract = () => {
 
 const auctionSC = loadAuctionContract()
 
+const toLowerCase = (val) => {
+  if (val) return val.toLowerCase()
+  else return val
+}
+const parseToFTM = (inWei) => {
+  return parseFloat(inWei.toString()) / 10 ** 18
+}
+const convertTime = (value) => {
+  return parseFloat(value) * 1000
+}
+
 const callAPI = async (endpoint, data) => {
   await axios({
     method: 'post',
@@ -29,12 +40,17 @@ const trackAuction = () => {
   console.log('auction tracker has been started')
 
   auctionSC.on('AuctionCreated', async (nftAddress, tokenID) => {
+    nftAddress = toLowerCase(nftAddress)
+    tokenID = parseInt(tokenID)
     await callAPI('auctionCreated', { nftAddress, tokenID })
   })
 
   auctionSC.on(
     'UpdateAuctionStartTime',
     async (nftAddress, tokenID, startTime) => {
+      nftAddress = toLowerCase(nftAddress)
+      tokenID = parseInt(tokenID)
+      startTime = convertTime(startTime)
       await callAPI('updateAuctionStartTime', {
         nftAddress,
         tokenID,
@@ -44,11 +60,17 @@ const trackAuction = () => {
   )
 
   auctionSC.on('UpdateAuctionEndTime', async (nftAddress, tokenID, endTime) => {
+    nftAddress = toLowerCase(nftAddress)
+    tokenID = parseInt(tokenID)
+    endTime = convertTime(endTime)
     await callAPI('updateAuctionEndTime', { nftAddress, tokenID, endTime })
   })
   auctionSC.on(
     'UpdateAuctionReservePrice',
     async (nftAddress, tokenID, reservePrice) => {
+      nftAddress = toLowerCase(nftAddress)
+      tokenID = parseInt(tokenID)
+      reservePrice = parseToFTM(reservePrice)
       await callAPI('updateAuctionReservePrice', {
         nftAddress,
         tokenID,
@@ -58,16 +80,28 @@ const trackAuction = () => {
   )
 
   auctionSC.on('BidPlaced', async (nftAddress, tokenID, bidder, bid) => {
+    nftAddress = toLowerCase(nftAddress)
+    tokenID = parseInt(tokenID)
+    bidder = toLowerCase(bidder)
+    bid = parseToFTM(bid)
     await callAPI('bidPlaced', { nftAddress, tokenID, bidder, bid })
   })
 
   auctionSC.on('BidWithdrawn', async (nftAddress, tokenID, bidder, bid) => {
+    nftAddress = toLowerCase(nftAddress)
+    tokenID = parseInt(tokenID)
+    bidder = toLowerCase(bidder)
+    bid = parseToFTM(bid)
     await callAPI('bidWithdrawn', { nftAddress, tokenID, bidder, bid })
   })
 
   auctionSC.on(
     'AuctionResulted',
     async (nftAddress, tokenID, winner, winningBid) => {
+      nftAddress = toLowerCase(nftAddress)
+      tokenID = parseInt(tokenID)
+      winner = toLowerCase(winner)
+      winningBid = parseToFTM(winningBid)
       await callAPI('auctionResulted', {
         nftAddress,
         tokenID,
@@ -77,6 +111,8 @@ const trackAuction = () => {
     },
   )
   auctionSC.on('AuctionCancelled', async (nftAddress, tokenID) => {
+    nftAddress = toLowerCase(nftAddress)
+    tokenID = parseInt(tokenID)
     await callAPI('auctionCancelled', { nftAddress, tokenID })
   })
 }
