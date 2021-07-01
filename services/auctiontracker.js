@@ -5,7 +5,7 @@ const axios = require('axios')
 const Auction_SC = require('../constants/auction_sc_abi')
 const rpcapi = process.env.MAINNET_RPC
 const provider = new ethers.providers.JsonRpcProvider(rpcapi, 250)
-const apiEndPoint = 'https://api0.artion.io/auction/'
+const apiEndPoint = process.env.API_ENDPOINT
 
 const loadAuctionContract = () => {
   let abi = Auction_SC.abi
