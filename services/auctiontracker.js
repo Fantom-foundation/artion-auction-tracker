@@ -3,13 +3,14 @@ const ethers = require('ethers')
 const axios = require('axios')
 
 const Auction_SC = require('../constants/auction_sc_abi')
-const rpcapi = process.env.MAINNET_RPC
-const provider = new ethers.providers.JsonRpcProvider(rpcapi, 250)
+const rpcapi = process.env.NETWORK_RPC
+const chainID = parseInt(process.env.NETWORK_CHAINID)
+const provider = new ethers.providers.JsonRpcProvider(rpcapi, chainID)
 const apiEndPoint = process.env.API_ENDPOINT
 
 const loadAuctionContract = () => {
   let abi = Auction_SC.abi
-  let address = Auction_SC.address
+  let address = process.env.CONTRACTADDRESS
 
   let contract = new ethers.Contract(address, abi, provider)
   return contract
