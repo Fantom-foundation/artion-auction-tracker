@@ -68,13 +68,15 @@ const trackAuction = () => {
   })
   auctionSC.on(
     'UpdateAuctionReservePrice',
-    async (nftAddress, tokenID, reservePrice) => {
+    async (nftAddress, tokenID, paymentToken, reservePrice) => {
       nftAddress = toLowerCase(nftAddress)
       tokenID = parseInt(tokenID)
+      paymentToken = toLowerCase(paymentToken)
       reservePrice = parseToFTM(reservePrice)
       await callAPI('updateAuctionReservePrice', {
         nftAddress,
         tokenID,
+        paymentToken,
         reservePrice,
       })
     },
@@ -98,15 +100,24 @@ const trackAuction = () => {
 
   auctionSC.on(
     'AuctionResulted',
-    async (nftAddress, tokenID, winner, winningBid) => {
+    async (
+      nftAddress,
+      tokenID,
+      winner,
+      paymentToken,
+      unitPrice,
+      winningBid,
+    ) => {
       nftAddress = toLowerCase(nftAddress)
       tokenID = parseInt(tokenID)
       winner = toLowerCase(winner)
+      paymentToken = toLowerCase(paymentToken)
       winningBid = parseToFTM(winningBid)
       await callAPI('auctionResulted', {
         nftAddress,
         tokenID,
         winner,
+        paymentToken,
         winningBid,
       })
     },
