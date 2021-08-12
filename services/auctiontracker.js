@@ -97,10 +97,12 @@ const trackAuction = () => {
     bid = parseToFTM(bid)
     await callAPI('bidWithdrawn', { nftAddress, tokenID, bidder, bid })
   })
-  auctionSC.on('BidRefunded', async (bidder, bid) => {
+  auctionSC.on('BidRefunded', async (nft, tokenID, bidder, bid) => {
+    nft = toLowerCase(nft)
+    tokenID = parseInt(tokenID)
     bidder = toLowerCase(bidder)
     bid = parseToFTM(bid)
-    await callAPI('bidRefunded', { bidder, bid })
+    await callAPI('bidRefunded', { nft, tokenID, bidder, bid })
   })
 
   auctionSC.on(
