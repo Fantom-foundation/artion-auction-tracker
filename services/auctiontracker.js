@@ -22,6 +22,7 @@ const toLowerCase = (val) => {
   if (val) return val.toLowerCase()
   else return val
 }
+const decimalStore = new Map()
 const parseToken = async (inWei, paymentToken) => {
   paymentToken = toLowerCase(paymentToken)
   let tokenDecimals = decimalStore.get(paymentToken)
