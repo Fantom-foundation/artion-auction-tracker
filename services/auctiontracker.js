@@ -22,8 +22,19 @@ const toLowerCase = (val) => {
   if (val) return val.toLowerCase()
   else return val
 }
-const parseToFTM = (inWei) => {
-  return parseFloat(inWei.toString()) / 10 ** 18
+const parseToken = async (inWei, paymentToken) => {
+  paymentToken = toLowerCase(paymentToken)
+  let tokenDecimals = decimalStore.get(paymentToken)
+  console.log(tokenDecimals)
+  if (tokenDecimals > 0)
+    return parseFloat(inWei.toString()) / 10 ** tokenDecimals
+  let decimals = await axios({
+    method: 'get',
+    url: process.env.DECIMAL_ENDPOINT + paymentToken,
+  })
+  decimals = parseInt(decimals.data.data)
+  decimalStore.set(paymentToken, decimals)
+  return parseFloat(inWei.toString()) / 10 ** decimals
 }
 const convertTime = (value) => {
   return parseFloat(value) * 1000
@@ -72,7 +83,7 @@ const trackAuction = () => {
       nftAddress = toLowerCase(nftAddress)
       tokenID = parseInt(tokenID)
       paymentToken = toLowerCase(paymentToken)
-      reservePrice = parseToFTM(reservePrice)
+      reservePrice = await parseToken(reservePrice, paymentToken)
       await callAPI('updateAuctionReservePrice', {
         nftAddress,
         tokenID,
@@ -119,7 +130,7 @@ const trackAuction = () => {
       tokenID = parseInt(tokenID)
       winner = toLowerCase(winner)
       paymentToken = toLowerCase(paymentToken)
-      winningBid = parseToFTM(winningBid)
+      winningBid = await parseToken(winningBid, paymentToken)
       await callAPI('auctionResulted', {
         nftAddress,
         tokenID,
