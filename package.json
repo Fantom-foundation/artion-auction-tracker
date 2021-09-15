@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node app.js"
+    "start": "node app.js",
+    "dev": "npx nodemon app.js"
   },
   "keywords": [],
   "author": "Jason",
@@ -20,6 +21,7 @@
     "express": "^4.17.1",
     "fs": "^0.0.1-security",
     "prettier": "^2.2.1",
-    "rawmodel": "^1.33.0"
+    "rawmodel": "^1.33.0",
+    "nodemon": "^2.0.12"
   }
 }
