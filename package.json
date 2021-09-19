@@ -22,6 +22,7 @@
     "fs": "^0.0.1-security",
     "prettier": "^2.2.1",
     "rawmodel": "^1.33.0",
-    "nodemon": "^2.0.12"
+    "nodemon": "^2.0.12",
+    "mongoose": "^5.12.1"
   }
 }
