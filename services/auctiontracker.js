@@ -1,9 +1,12 @@
 require('dotenv').config()
 const ethers = require('ethers')
 const axios = require('axios')
-const mongoose = require('mongoose')
 
-const AuctionTrackerState = mongoose.model('AUCTIONTRACKERSTATE');
+const mongoose = require('mongoose')
+const TrackerState = mongoose.model('TRACKER_STATE');
+const EVENT_DEAD_LETTER_QUEUE = require('../models/event_deadletter_queue');
+const EventDeadLetterQueue = mongoose.model('EVENT_DEAD_LETTER_QUEUE', EVENT_DEAD_LETTER_QUEUE);
+
 const Auction_SC = require('../constants/auction_sc_abi')
 const rpcapi = process.env.NETWORK_RPC
 const chainID = parseInt(process.env.NETWORK_CHAINID)
@@ -21,11 +24,22 @@ const auctionSC = loadAuctionContract()
 
 
 const callAPI = async (endpoint, data) => {
-  return axios({
-    method: 'post',
-    url: apiEndPoint + endpoint,
-    data,
-  })
+  try {
+    await axios({
+      method: 'post',
+      url: apiEndPoint + endpoint,
+      data,
+    })
+  } catch(err) {
+    // If bad request save to dead letter queue
+    if (err.response.status === 400) {
+      console.warn(`[bad-request] add event to dead-letter-queue, txHash: ${data.transactionHash}`);
+      await EventDeadLetterQueue.create({contract: process.env.CONTRACTADDRESS, event: data})
+      return;
+    }
+    // If other reasons (server unreachable for example) throw and block;
+    throw err;
+  }
 }
 
 const processAuctionEvents = async (startFromBlock) => {
@@ -119,9 +133,9 @@ const processAuctionEvents = async (startFromBlock) => {
       lastBlockProcessed = currentBlock;
     }
 
-    return AuctionTrackerState.updateOne({contractAddress: process.env.CONTRACTADDRESS}, {lastBlockProcessed})
+    return TrackerState.updateOne({contractAddress: process.env.CONTRACTADDRESS}, {lastBlockProcessed})
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
   }
 }
 
