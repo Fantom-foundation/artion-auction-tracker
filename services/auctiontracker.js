@@ -32,7 +32,7 @@ const callAPI = async (endpoint, data) => {
     })
   } catch(err) {
     // If bad request save to dead letter queue
-    if (err.response.status === 400) {
+    if (err && err.response && err.response.status === 400) {
       console.warn(`[bad-request] add event to dead-letter-queue, txHash: ${data.transactionHash}`);
       await EventDeadLetterQueue.create({contract: process.env.CONTRACTADDRESS, event: data})
       return;
