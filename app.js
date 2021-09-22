@@ -1,6 +1,6 @@
 require('dotenv').config()
 const mongoose = require('mongoose');
-require('./models/trackerstate');
+require('./models/tracker_state');
 const TRACKER_STATE = require('./models/tracker_state');
 const TrackerState = mongoose.model('TRACKER_STATE', TRACKER_STATE);
 const processAuctionEvents = require('./services/auctiontracker')

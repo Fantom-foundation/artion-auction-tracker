@@ -44,7 +44,7 @@ const callAPI = async (endpoint, data) => {
 
 const processAuctionEvents = async (startFromBlock) => {
   const currentBlock = await provider.getBlockNumber();
-  let lastBlockProcessed = currentBlock;
+  let lastBlockProcessed = startFromBlock;
 
   console.info(`Tracking block: ${startFromBlock} - ${currentBlock}`)
 
@@ -81,44 +81,44 @@ const processAuctionEvents = async (startFromBlock) => {
   async function handleEvents(events) {
 
     for (const event of events) {
-      // Auction lifecycle events
+      // // Auction lifecycle events
       if (event.event === "AuctionCreated") {
+        console.log(`[AuctionCreated] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleCreateAuction(event);
-        console.log("CREATE")
       }
       if (event.event === "AuctionCancelled") {
+        console.log(`[AuctionCancelled] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionCancelled(event);
-        console.log("CANCEL")
       }
       if (event.event === "AuctionResulted") {
+        console.log(`[AuctionResulted] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionResulted(event)
-        console.log("RESULT")
       }
       // Auction update events
       if (event.event === "UpdateAuctionStartTime") {
+        console.log(`[UpdateAuctionStartTime] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionUpdateStartTime(event);
-        console.log("STARTTIME");
       }
       if (event.event === "updateAuctionEndTime") {
+        console.log(`[updateAuctionEndTime] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionUpdateEndTime(event)
-        console.log("ENDTIME")
       }
       if (event.event === "UpdateAuctionReservePrice") {
+        console.log(`[UpdateAuctionReservePrice] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionUpdateReservePrice(event)
-        console.log("RESERVE!")
       }
       // Bid events
       if (event.event === "BidPlaced") {
+        console.log(`[BidPlaced] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionBidPlaced(event)
-        console.log("BID PLACED!!!!!", event)
       }
       if (event.event === "BidWithdrawn") {
+        console.log(`[BidWithdrawn] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionBidWithdrawn(event)
-        console.log("BID WITHDRAWN!!", event)
       }
       if (event.event === "BidRefunded") {
+        console.log(`[BidRefunded] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
         await handleAuctionBidRefunded(event)
-        console.log("BID REFUNDED")
       }
 
       lastBlockProcessed = event.blockNumber + 1;
@@ -127,13 +127,35 @@ const processAuctionEvents = async (startFromBlock) => {
 
   try {
     const pastEvents = await auctionSC.queryFilter('*', startFromBlock, currentBlock);
-    await handleEvents(pastEvents);
+    const batches = pastEvents.reduce((batchArray, item, index) => {
+      const chunkIndex = Math.floor(index / 10)
 
-    if (!pastEvents.length) {
-      lastBlockProcessed = currentBlock;
-    }
+      if(!batchArray[chunkIndex]) {
+        batchArray[chunkIndex] = [] // start a new chunk
+      }
 
-    return TrackerState.updateOne({contractAddress: process.env.CONTRACTADDRESS}, {lastBlockProcessed})
+      batchArray[chunkIndex].push(item)
+
+      return batchArray
+    }, [])
+
+    batches.length && console.log(`Event batches to run ${batches.length}`);
+    let runBatch = 0;
+    await new Promise((resolve) => {
+      let interval = setInterval(async () => {
+        if (runBatch >= batches.length) {
+          clearInterval(interval);
+          return resolve()
+        }
+
+        await handleEvents(batches[runBatch]);
+        await TrackerState.updateOne({contractAddress: process.env.CONTRACTADDRESS}, {lastBlockProcessed});
+        console.log(`[PastEvents] Proccesed batch ${runBatch + 1} of ${batches.length}`);
+        console.log(`[PastEvents] LastBlockProcessed: ${lastBlockProcessed}`);
+
+        runBatch += 1;
+      }, 1000);
+    });
   } catch (err) {
     console.error(err.message);
   }
