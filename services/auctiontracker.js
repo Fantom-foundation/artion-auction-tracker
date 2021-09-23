@@ -2,6 +2,11 @@ require('dotenv').config()
 const ethers = require('ethers')
 const axios = require('axios')
 
+const mongoose = require('mongoose')
+const TrackerState = mongoose.model('TRACKER_STATE');
+const EVENT_DEAD_LETTER_QUEUE = require('../models/event_deadletter_queue');
+const EventDeadLetterQueue = mongoose.model('EVENT_DEAD_LETTER_QUEUE', EVENT_DEAD_LETTER_QUEUE);
+
 const Auction_SC = require('../constants/auction_sc_abi')
 const rpcapi = process.env.NETWORK_RPC
 const chainID = parseInt(process.env.NETWORK_CHAINID)
@@ -12,140 +17,148 @@ const loadAuctionContract = () => {
   let abi = Auction_SC.abi
   let address = process.env.CONTRACTADDRESS
 
-  let contract = new ethers.Contract(address, abi, provider)
-  return contract
+  return new ethers.Contract(address, abi, provider)
 }
 
 const auctionSC = loadAuctionContract()
 
-const toLowerCase = (val) => {
-  if (val) return val.toLowerCase()
-  else return val
-}
-const decimalStore = new Map()
-const parseToken = async (inWei, paymentToken) => {
-  paymentToken = toLowerCase(paymentToken)
-  let tokenDecimals = decimalStore.get(paymentToken)
-  console.log(tokenDecimals)
-  if (tokenDecimals > 0)
-    return parseFloat(inWei.toString()) / 10 ** tokenDecimals
-  let decimals = await axios({
-    method: 'get',
-    url: process.env.DECIMAL_ENDPOINT + paymentToken,
-  })
-  decimals = parseInt(decimals.data.data)
-  decimalStore.set(paymentToken, decimals)
-  return parseFloat(inWei.toString()) / 10 ** decimals
-}
-const convertTime = (value) => {
-  return parseFloat(value) * 1000
-}
 
 const callAPI = async (endpoint, data) => {
-  await axios({
-    method: 'post',
-    url: apiEndPoint + endpoint,
-    data,
-  })
+  try {
+    await axios({
+      method: 'post',
+      url: apiEndPoint + endpoint,
+      data,
+    })
+  } catch(err) {
+    // If bad request save to dead letter queue
+    if (err && err.response && err.response.status === 400) {
+      console.warn(`[bad-request] add event to dead-letter-queue, txHash: ${data.transactionHash}`);
+      await EventDeadLetterQueue.create({contract: process.env.CONTRACTADDRESS, event: data})
+      return;
+    }
+    // If other reasons (server unreachable for example) throw and block;
+    throw err;
+  }
 }
 
-const trackAuction = () => {
-  console.log('auction tracker has been started')
+const processAuctionEvents = async (startFromBlock) => {
+  const currentBlock = await provider.getBlockNumber();
+  let lastBlockProcessed = startFromBlock;
 
-  auctionSC.on('AuctionCreated', async (nftAddress, tokenID) => {
-    nftAddress = toLowerCase(nftAddress)
-    tokenID = parseInt(tokenID)
-    await callAPI('auctionCreated', { nftAddress, tokenID })
-  })
+  console.info(`Tracking block: ${startFromBlock} - ${currentBlock}`)
 
-  auctionSC.on(
-    'UpdateAuctionStartTime',
-    async (nftAddress, tokenID, startTime) => {
-      nftAddress = toLowerCase(nftAddress)
-      tokenID = parseInt(tokenID)
-      startTime = convertTime(startTime)
-      await callAPI('updateAuctionStartTime', {
-        nftAddress,
-        tokenID,
-        startTime,
-      })
-    },
-  )
+  const handleCreateAuction = async (event) => {
+    return callAPI('auctionCreated', event)
+  }
+  const handleAuctionCancelled = async (event) => {
+    return callAPI('auctionCancelled', event)
+  }
+  const handleAuctionResulted = async (event) => {
+    return callAPI('auctionResulted', event)
+  }
 
-  auctionSC.on('UpdateAuctionEndTime', async (nftAddress, tokenID, endTime) => {
-    nftAddress = toLowerCase(nftAddress)
-    tokenID = parseInt(tokenID)
-    endTime = convertTime(endTime)
-    await callAPI('updateAuctionEndTime', { nftAddress, tokenID, endTime })
-  })
-  auctionSC.on(
-    'UpdateAuctionReservePrice',
-    async (nftAddress, tokenID, paymentToken, reservePrice) => {
-      nftAddress = toLowerCase(nftAddress)
-      tokenID = parseInt(tokenID)
-      paymentToken = toLowerCase(paymentToken)
-      reservePrice = await parseToken(reservePrice, paymentToken)
-      await callAPI('updateAuctionReservePrice', {
-        nftAddress,
-        tokenID,
-        paymentToken,
-        reservePrice,
-      })
-    },
-  )
+  const handleAuctionUpdateStartTime = async (event) => {
+    return callAPI('updateAuctionStartTime', event)
+  }
+  const handleAuctionUpdateEndTime = async (event) => {
+    return callAPI('updateAuctionEndTime', event)
+  }
+  const handleAuctionUpdateReservePrice = async (event) => {
+    return callAPI('updateAuctionReservePrice', event)
+  }
 
-  auctionSC.on('BidPlaced', async (nftAddress, tokenID, bidder, bid) => {
-    nftAddress = toLowerCase(nftAddress)
-    tokenID = parseInt(tokenID)
-    bidder = toLowerCase(bidder)
-    bid = parseToFTM(bid)
-    await callAPI('bidPlaced', { nftAddress, tokenID, bidder, bid })
-  })
+  const handleAuctionBidPlaced = async (event) => {
+    return callAPI('bidPlaced', event)
+  }
+  const handleAuctionBidWithdrawn = async (event) => {
+    return callAPI('bidWithdrawn', event)
+  }
+  const handleAuctionBidRefunded = async (event) => {
+    return callAPI('bidRefunded', event)
+  }
 
-  auctionSC.on('BidWithdrawn', async (nftAddress, tokenID, bidder, bid) => {
-    nftAddress = toLowerCase(nftAddress)
-    tokenID = parseInt(tokenID)
-    bidder = toLowerCase(bidder)
-    bid = parseToFTM(bid)
-    await callAPI('bidWithdrawn', { nftAddress, tokenID, bidder, bid })
-  })
-  auctionSC.on('BidRefunded', async (nft, tokenID, bidder, bid) => {
-    nft = toLowerCase(nft)
-    tokenID = parseInt(tokenID)
-    bidder = toLowerCase(bidder)
-    bid = parseToFTM(bid)
-    await callAPI('bidRefunded', { nft, tokenID, bidder, bid })
-  })
+  async function handleEvents(events) {
 
-  auctionSC.on(
-    'AuctionResulted',
-    async (
-      nftAddress,
-      tokenID,
-      winner,
-      paymentToken,
-      unitPrice,
-      winningBid,
-    ) => {
-      nftAddress = toLowerCase(nftAddress)
-      tokenID = parseInt(tokenID)
-      winner = toLowerCase(winner)
-      paymentToken = toLowerCase(paymentToken)
-      winningBid = await parseToken(winningBid, paymentToken)
-      await callAPI('auctionResulted', {
-        nftAddress,
-        tokenID,
-        winner,
-        paymentToken,
-        winningBid,
-      })
-    },
-  )
-  auctionSC.on('AuctionCancelled', async (nftAddress, tokenID) => {
-    nftAddress = toLowerCase(nftAddress)
-    tokenID = parseInt(tokenID)
-    await callAPI('auctionCancelled', { nftAddress, tokenID })
-  })
+    for (const event of events) {
+      // // Auction lifecycle events
+      if (event.event === "AuctionCreated") {
+        console.log(`[AuctionCreated] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleCreateAuction(event);
+      }
+      if (event.event === "AuctionCancelled") {
+        console.log(`[AuctionCancelled] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionCancelled(event);
+      }
+      if (event.event === "AuctionResulted") {
+        console.log(`[AuctionResulted] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionResulted(event)
+      }
+      // Auction update events
+      if (event.event === "UpdateAuctionStartTime") {
+        console.log(`[UpdateAuctionStartTime] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionUpdateStartTime(event);
+      }
+      if (event.event === "updateAuctionEndTime") {
+        console.log(`[updateAuctionEndTime] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionUpdateEndTime(event)
+      }
+      if (event.event === "UpdateAuctionReservePrice") {
+        console.log(`[UpdateAuctionReservePrice] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionUpdateReservePrice(event)
+      }
+      // Bid events
+      if (event.event === "BidPlaced") {
+        console.log(`[BidPlaced] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionBidPlaced(event)
+      }
+      if (event.event === "BidWithdrawn") {
+        console.log(`[BidWithdrawn] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionBidWithdrawn(event)
+      }
+      if (event.event === "BidRefunded") {
+        console.log(`[BidRefunded] tx: ${event.transactionHash}, block: ${event.blockNumber}`)
+        await handleAuctionBidRefunded(event)
+      }
+
+      lastBlockProcessed = event.blockNumber + 1;
+    }
+  }
+
+  try {
+    const pastEvents = await auctionSC.queryFilter('*', startFromBlock, currentBlock);
+    const batches = pastEvents.reduce((batchArray, item, index) => {
+      const chunkIndex = Math.floor(index / 10)
+
+      if(!batchArray[chunkIndex]) {
+        batchArray[chunkIndex] = [] // start a new chunk
+      }
+
+      batchArray[chunkIndex].push(item)
+
+      return batchArray
+    }, [])
+
+    batches.length && console.log(`Event batches to run ${batches.length}`);
+    let runBatch = 0;
+    await new Promise((resolve) => {
+      let interval = setInterval(async () => {
+        if (runBatch >= batches.length) {
+          clearInterval(interval);
+          return resolve()
+        }
+
+        await handleEvents(batches[runBatch]);
+        await TrackerState.updateOne({contractAddress: process.env.CONTRACTADDRESS}, {lastBlockProcessed});
+        console.log(`[PastEvents] Proccesed batch ${runBatch + 1} of ${batches.length}`);
+        console.log(`[PastEvents] LastBlockProcessed: ${lastBlockProcessed}`);
+
+        runBatch += 1;
+      }, 1000);
+    });
+  } catch (err) {
+    console.error(err.message);
+  }
 }
 
-module.exports = trackAuction
+module.exports = processAuctionEvents
