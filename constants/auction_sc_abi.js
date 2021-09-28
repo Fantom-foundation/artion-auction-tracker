@@ -49,6 +49,12 @@ const AuctionContractInfo = {
       anonymous: false,
       inputs: [
         {
+          indexed: false,
+          internalType: 'address',
+          name: 'oldOwner',
+          type: 'address'
+        },
+        {
           indexed: true,
           internalType: 'address',
           name: 'nftAddress',
