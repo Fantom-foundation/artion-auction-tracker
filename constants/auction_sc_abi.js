@@ -242,6 +242,31 @@ const AuctionContractInfo = {
         },
         {
           indexed: false,
+          internalType: 'uint256',
+          name: 'endTime',
+          type: 'uint256'
+        }
+      ],
+      name: 'UpdateAuctionEndTime',
+      type: 'event'
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: true,
+          internalType: 'address',
+          name: 'nftAddress',
+          type: 'address'
+        },
+        {
+          indexed: true,
+          internalType: 'uint256',
+          name: 'tokenId',
+          type: 'uint256'
+        },
+        {
+          indexed: false,
           internalType: 'address',
           name: 'payToken',
           type: 'address'
@@ -260,6 +285,31 @@ const AuctionContractInfo = {
       anonymous: false,
       inputs: [
         {
+          indexed: true,
+          internalType: 'address',
+          name: 'nftAddress',
+          type: 'address'
+        },
+        {
+          indexed: true,
+          internalType: 'uint256',
+          name: 'tokenId',
+          type: 'uint256'
+        },
+        {
+          indexed: false,
+          internalType: 'uint256',
+          name: 'startTime',
+          type: 'uint256'
+        }
+      ],
+      name: 'UpdateAuctionStartTime',
+      type: 'event'
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
           indexed: false,
           internalType: 'uint256',
           name: 'bidWithdrawalLockTime',
@@ -267,6 +317,19 @@ const AuctionContractInfo = {
         }
       ],
       name: 'UpdateBidWithdrawalLockTime',
+      type: 'event'
+    },
+    {
+      anonymous: false,
+      inputs: [
+        {
+          indexed: false,
+          internalType: 'uint256',
+          name: 'minBidIncrement',
+          type: 'uint256'
+        }
+      ],
+      name: 'UpdateMinBidIncrement',
       type: 'event'
     },
     {
@@ -581,7 +644,7 @@ const AuctionContractInfo = {
     },
     {
       inputs: [],
-      name: 'maxAuctionLength',
+      name: 'minBidIncrement',
       outputs: [
         {
           internalType: 'uint256',
@@ -711,24 +774,6 @@ const AuctionContractInfo = {
       type: 'function'
     },
     {
-      inputs: [
-        {
-          internalType: 'address',
-          name: '_nftAddress',
-          type: 'address'
-        },
-        {
-          internalType: 'uint256',
-          name: '_tokenId',
-          type: 'uint256'
-        }
-      ],
-      name: 'resultFailedAuction',
-      outputs: [],
-      stateMutability: 'nonpayable',
-      type: 'function'
-    },
-    {
       inputs: [],
       name: 'toggleIsPaused',
       outputs: [],
@@ -775,11 +820,57 @@ const AuctionContractInfo = {
         },
         {
           internalType: 'uint256',
+          name: '_endTimestamp',
+          type: 'uint256'
+        }
+      ],
+      name: 'updateAuctionEndTime',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function'
+    },
+    {
+      inputs: [
+        {
+          internalType: 'address',
+          name: '_nftAddress',
+          type: 'address'
+        },
+        {
+          internalType: 'uint256',
+          name: '_tokenId',
+          type: 'uint256'
+        },
+        {
+          internalType: 'uint256',
           name: '_reservePrice',
           type: 'uint256'
         }
       ],
       name: 'updateAuctionReservePrice',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function'
+    },
+    {
+      inputs: [
+        {
+          internalType: 'address',
+          name: '_nftAddress',
+          type: 'address'
+        },
+        {
+          internalType: 'uint256',
+          name: '_tokenId',
+          type: 'uint256'
+        },
+        {
+          internalType: 'uint256',
+          name: '_startTime',
+          type: 'uint256'
+        }
+      ],
+      name: 'updateAuctionStartTime',
       outputs: [],
       stateMutability: 'nonpayable',
       type: 'function'
@@ -793,6 +884,19 @@ const AuctionContractInfo = {
         }
       ],
       name: 'updateBidWithdrawalLockTime',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function'
+    },
+    {
+      inputs: [
+        {
+          internalType: 'uint256',
+          name: '_minBidIncrement',
+          type: 'uint256'
+        }
+      ],
+      name: 'updateMinBidIncrement',
       outputs: [],
       stateMutability: 'nonpayable',
       type: 'function'
@@ -819,6 +923,24 @@ const AuctionContractInfo = {
         }
       ],
       name: 'updatePlatformFeeRecipient',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function'
+    },
+    {
+      inputs: [
+        {
+          internalType: 'address',
+          name: '_nftAddress',
+          type: 'address'
+        },
+        {
+          internalType: 'uint256',
+          name: '_tokenId',
+          type: 'uint256'
+        }
+      ],
+      name: 'withdrawBid',
       outputs: [],
       stateMutability: 'nonpayable',
       type: 'function'
